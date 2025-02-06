@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: monitoring
+  name: loki
+  labels:
+    app: loki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      securityContext:
+        runAsUser: 0
+        runAsNonRoot: false
+        runAsGroup: 0
+      containers:
+        - image: grafana/loki:latest
+          name: loki
+          command: ["/usr/bin/loki", "-config.file=/etc/loki/config.yaml"]
+          ports:
+            - containerPort: 3100
+            - containerPort: 9096
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/secrets/credentials.json
+          volumeMounts:
+            - name: service-account
+              mountPath: /etc/secrets
+            - name: config
+              mountPath: /etc/loki
+      volumes:
+        - name: service-account
+          secret:
+            secretName: log-aggregator-service-account-credentials
+        - name: config
+          configMap:
+            name: loki-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: monitoring
+  name: loki
+  labels:
+    svc: loki
+spec:
+  type: ClusterIP # Only access from within the Cluster
+  ports:
+    - protocol: TCP
+      port: 9096
+      targetPort: 9096
+      name: grpc
+    - protocol: TCP
+      port: 3100
+      targetPort: 3100
+      name: api
+  selector:
+    app: loki

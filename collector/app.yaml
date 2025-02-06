@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: monitoring
+  name: otel-collector
+  labels:
+    app: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      serviceAccountName: otel-collector
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:latest
+          command:
+            [
+              "/otelcol-contrib",
+              "--config=file:/etc/otelcol-contrib/config.yaml",
+            ]
+          # resources:
+          #   limits:
+          #     cpu: 250m
+          #     memory: 1024Mi
+          #   requests:
+          #     cpu: 100m
+          #     memory: 512Mi
+          volumeMounts:
+            - mountPath: /etc/otelcol-contrib/
+              name: config
+              readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: monitoring
+  labels:
+    app: otel-collector
+spec:
+  ports:
+    - protocol: TCP
+      port: 4318
+      targetPort: 4318
+      name: otlp-http
+    - protocol: TCP
+      port: 4317
+      targetPort: 4317
+      name: otlp-grpc
+    - name: metrics # Default endpoint for querying metrics.
+      port: 8888
+    - name: prometheus-exporter
+      port: 9464
+  selector:
+    app: otel-collector

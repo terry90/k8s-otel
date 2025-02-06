@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: monitoring
+  name: tempo
+  labels:
+    app: tempo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tempo
+  template:
+    metadata:
+      labels:
+        app: tempo
+    spec:
+      containers:
+        - image: grafana/tempo:latest
+          name: tempo
+          command: ["/tempo", "-config.file=/etc/config/tempo/config.yaml"]
+          ports:
+            - containerPort: 3200
+            - containerPort: 4317
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config/tempo
+      volumes:
+        - name: config
+          configMap:
+            name: tempo-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: monitoring
+  name: tempo
+  labels:
+    svc: tempo
+spec:
+  type: ClusterIP # Only access from within the Cluster
+  ports:
+    - protocol: TCP
+      port: 4317
+      targetPort: 4317
+      name: grpc
+    - protocol: TCP
+      port: 3200
+      targetPort: 3200
+      name: api
+  selector:
+    app: tempo
